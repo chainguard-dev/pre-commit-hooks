@@ -1,7 +1,11 @@
--   id: check-for-epoch-bump
-    name: Checks that package yaml files have epoch bumps compared to main
-    description: Helps to prevent any accidental forgotten epoch bumps so packages rebuild properly
-    entry: scripts/check-for-epoch-bump.sh
-    language: script
-    stages: [pre-commit, manual]
-    types: [yaml]
+- id: check-for-epoch-bump
+  name: Checks that package yaml files have epoch bumps compared to main
+  description: Helps to prevent any accidental forgotten epoch bumps so packages rebuild properly
+  entry: scripts/check-for-epoch-bump.sh
+  language: script
+  verbose: true
+  stages:
+    - pre-commit
+    - manual
+  types:
+    - yaml
