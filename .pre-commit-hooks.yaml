@@ -1,3 +1,4 @@
+# See https://eng.inky.wtf/docs/technical/git/pre-commit for info on how to edit this file.
 - id: check-for-epoch-bump
   name: Checks that package yaml files have epoch bumps compared to main
   description: Helps to prevent any accidental forgotten epoch bumps so packages rebuild properly
