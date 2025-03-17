@@ -13,7 +13,7 @@ repos:
       - id: yam
   # TODO: Swap with CG repo: - repo: https://github.com/wolfi-dev/wolfictl
   - repo: https://github.com/amberarcadia/wolfictl
-    rev: 8acdd9e21ced7e95bba4ecc0ecc78b8f97b14de0
+    rev: 85b1301c4d17fcd0c8f0ce455724941cae815d68
     hooks:
       - id: wolfictl-lint
   - repo: https://github.com/golangci/misspell
