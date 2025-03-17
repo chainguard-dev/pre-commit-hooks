@@ -3,7 +3,7 @@
 # and can be assumed to be the "source of truth" for our pre-commit rules.
 repos:
   - repo: https://github.com/chainguard-dev/pre-commit-hooks
-    rev: f924dc7fec99dc4252786ce985b3fa34da8f6f77
+    rev: e4f3bba353cc583ce73f660dcf217e245fd681d3
     hooks:
       - id: check-for-epoch-bump
   # TODO: Swap with CG repo: - repo: https://github.com/chainguard-dev/yam
@@ -16,6 +16,10 @@ repos:
     rev: 8acdd9e21ced7e95bba4ecc0ecc78b8f97b14de0
     hooks:
       - id: wolfictl-lint
+  - repo: https://github.com/golangci/misspell
+    rev: 528d713e620bdf4b41849db93cb489c4fef9f5c5 # v0.6.0
+    hooks:
+      - id: misspell
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
