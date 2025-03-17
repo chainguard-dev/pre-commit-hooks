@@ -1,15 +1,28 @@
+# In general, this file should be able to be used as-is in other repos
+# such as wolfi-dev/os, enterprise-packages, and extra-packages,
+# and can be assumed to be the "source of truth" for our pre-commit rules.
 repos:
   - repo: https://github.com/chainguard-dev/pre-commit-hooks
     rev: f924dc7fec99dc4252786ce985b3fa34da8f6f77
     hooks:
       - id: check-for-epoch-bump
-  #- repo: https://github.com/chainguard-dev/yam
+  # TODO: Swap with CG repo: - repo: https://github.com/chainguard-dev/yam
   - repo: https://github.com/amberarcadia/yam
     rev: 997f75d8b0e93de6fcedd0c6c93d1ec9019dc2a8
     hooks:
       - id: yam
-  #- repo: https://github.com/wolfi-dev/wolfictl
+  # TODO: Swap with CG repo: - repo: https://github.com/wolfi-dev/wolfictl
   - repo: https://github.com/amberarcadia/wolfictl
     rev: 8acdd9e21ced7e95bba4ecc0ecc78b8f97b14de0
     hooks:
       - id: wolfictl-lint
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+      - id: forbid-submodules
+      - id: check-added-large-files
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: detect-private-key
