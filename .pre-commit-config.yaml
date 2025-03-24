@@ -7,9 +7,8 @@ repos:
     rev: e4f3bba353cc583ce73f660dcf217e245fd681d3
     hooks:
       - id: check-for-epoch-bump
-  # TODO: Swap with CG repo: - repo: https://github.com/chainguard-dev/yam
-  - repo: https://github.com/amberarcadia/yam
-    rev: 997f75d8b0e93de6fcedd0c6c93d1ec9019dc2a8
+  - repo: https://github.com/chainguard-dev/yam
+    rev: 498642e77997ba79709f43a7ee2c84b12b2145bb # v0.2.12
     hooks:
       - id: yam
   # TODO: Swap with CG repo: - repo: https://github.com/wolfi-dev/wolfictl
