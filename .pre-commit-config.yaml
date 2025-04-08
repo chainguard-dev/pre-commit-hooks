@@ -1,4 +1,4 @@
-# In general, this file (when sourced from https://github.com/chainguard-dev/pre-commit-hooks) 
+# In general, this file (when sourced from https://github.com/chainguard-dev/pre-commit-hooks)
 # should be able to be used as-is in other repos such as wolfi-dev/os, enterprise-packages, and extra-packages,
 # and can be assumed to be the "source of truth" for our pre-commit rules.
 # See https://eng.inky.wtf/docs/technical/git/pre-commit for info on how to edit this file.
