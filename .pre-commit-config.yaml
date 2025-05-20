@@ -25,6 +25,10 @@ repos:
     hooks:
       - id: reorder-python-imports
         args: [--py39-plus, --add-import, 'from __future__ import annotations']
+  - repo: https://github.com/asottile/add-trailing-comma
+    rev: d2e6adc1665e461a764e2f38edfa2ef61f41be20  # frozen: v3.1.0
+    hooks:
+      - id: add-trailing-comma
   - repo: https://github.com/asottile/pyupgrade
     rev: ce40a160603ab0e7d9c627ae33d7ef3906e2d2b2  # frozen: v3.19.1
     hooks:

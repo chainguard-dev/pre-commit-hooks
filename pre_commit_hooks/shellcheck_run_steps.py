@@ -50,7 +50,7 @@ def do_shellcheck(melange_cfg):
         with tempfile.NamedTemporaryFile(mode="w") as shfile:
             shfile.write(step["runs"])
             subprocess.check_call(
-                ["shellcheck", "--shell=busybox", shfile.name]
+                ["shellcheck", "--shell=busybox", shfile.name],
             )
 
 
@@ -62,7 +62,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     melange_cfg = {}
     for filename in args.filenames:
         with tempfile.NamedTemporaryFile(
-            "w", delete_on_close=False
+            "w",
+            delete_on_close=False,
         ) as compiled_out:
             subprocess.check_call(
                 [
