@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import tempfile
 from collections.abc import Generator
@@ -51,10 +52,11 @@ def do_shellcheck(
     for step in pipelines:
         if "runs" not in step.keys():
             continue
-        with tempfile.NamedTemporaryFile(mode="w") as shfile:
+        with tempfile.NamedTemporaryFile(mode="w", dir=os.getcwd()) as shfile:
             shfile.write(step["runs"])
             subprocess.check_call(
-                shellcheck + ["--shell=busybox", "--", shfile.name],
+                shellcheck
+                + ["--shell=busybox", "--", os.path.basename(shfile.name)],
             )
 
 
@@ -63,7 +65,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("filenames", nargs="*", help="Filenames to check.")
     parser.add_argument(
         "--shellcheck",
-        default=["shellcheck"],
+        default=[
+            "docker",
+            "run",
+            f"--volume={os.getcwd()}:/mnt",
+            "--rm",
+            "-it",
+            "koalaman/shellcheck:latest",
+        ],
         nargs="*",
         help="shellcheck command",
     )
