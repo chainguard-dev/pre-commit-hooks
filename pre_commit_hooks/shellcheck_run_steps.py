@@ -43,7 +43,7 @@ def do_shellcheck(
 
     pkgs = [melange_cfg]
     pkgs.extend(melange_cfg.get("subpackages", []))
-    pipelines = []
+    pipelines: list[Mapping[str, Any]] = []
     for pkg in pkgs:
         pipelines.extend(pkg.get("pipeline", []))
         if "test" in pkg.keys():
