@@ -10,7 +10,7 @@ from typing import NamedTuple
 
 import ruamel.yaml
 
-yaml = ruamel.yaml.YAML(typ='safe')
+yaml = ruamel.yaml.YAML(typ="safe")
 
 
 def _exhaust(gen: Generator[str]) -> None:
@@ -36,43 +36,49 @@ def do_shellcheck(melange_cfg):
         return 0
 
     pkgs = [melange_cfg]
-    pkgs.extend(melange_cfg.get('subpackages', []))
+    pkgs.extend(melange_cfg.get("subpackages", []))
     pipelines = []
     for pkg in pkgs:
-        pipelines.extend(pkg.get('pipeline', []))
-        if 'test' in pkg.keys():
-            test_pipeline = pkg['test'].get('pipeline', [])
+        pipelines.extend(pkg.get("pipeline", []))
+        if "test" in pkg.keys():
+            test_pipeline = pkg["test"].get("pipeline", [])
             pipelines.extend(test_pipeline)
 
     for step in pipelines:
-        if 'runs' not in step.keys():
+        if "runs" not in step.keys():
             continue
-        with tempfile.NamedTemporaryFile(mode='w') as shfile:
-            shfile.write(step['runs'])
+        with tempfile.NamedTemporaryFile(mode="w") as shfile:
+            shfile.write(step["runs"])
             subprocess.check_call(
-                ['shellcheck', '--shell=busybox', shfile.name]
+                ["shellcheck", "--shell=busybox", shfile.name]
             )
+
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument('filenames', nargs='*', help='Filenames to check.')
+    parser.add_argument("filenames", nargs="*", help="Filenames to check.")
     args = parser.parse_args(argv)
 
     melange_cfg = {}
     for filename in args.filenames:
         with tempfile.NamedTemporaryFile(
-                'w', delete_on_close=False
+            "w", delete_on_close=False
         ) as compiled_out:
             subprocess.check_call(
                 [
-                    'melange', 'compile', '--arch', 'x86_64',
-                    '--pipeline-dir', './pipelines', filename,
+                    "melange",
+                    "compile",
+                    "--arch",
+                    "x86_64",
+                    "--pipeline-dir",
+                    "./pipelines",
+                    filename,
                 ],
                 stdout=compiled_out,
             )
             compiled_out.close()
             try:
-                with open(compiled_out.name, 'r') as compiled_in:
+                with open(compiled_out.name) as compiled_in:
                     melange_cfg = yaml.load(compiled_in)
                     do_shellcheck(melange_cfg)
             except ruamel.yaml.YAMLError as exc:
@@ -82,5 +88,5 @@ def main(argv: Sequence[str] | None = None) -> int:
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     raise SystemExit(main())
