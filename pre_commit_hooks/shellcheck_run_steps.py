@@ -4,6 +4,7 @@ import argparse
 import subprocess
 import tempfile
 from collections.abc import Generator
+from collections.abc import Mapping
 from collections.abc import Sequence
 from typing import Any
 from typing import NamedTuple
@@ -31,9 +32,9 @@ class Key(NamedTuple):
     unsafe: bool
 
 
-def do_shellcheck(melange_cfg):
+def do_shellcheck(melange_cfg: Mapping[str, Any]) -> None:
     if melange_cfg == {}:
-        return 0
+        return
 
     pkgs = [melange_cfg]
     pkgs.extend(melange_cfg.get("subpackages", []))
