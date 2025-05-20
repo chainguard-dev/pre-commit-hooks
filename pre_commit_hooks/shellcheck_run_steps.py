@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import subprocess
 import tempfile
@@ -48,16 +49,31 @@ def do_shellcheck(
         if "test" in pkg.keys():
             test_pipeline = pkg["test"].get("pipeline", [])
             pipelines.extend(test_pipeline)
-
-    for step in pipelines:
-        if "runs" not in step.keys():
-            continue
-        with tempfile.NamedTemporaryFile(mode="w", dir=os.getcwd()) as shfile:
-            shfile.write(step["runs"])
-            subprocess.check_call(
-                shellcheck
-                + ["--shell=busybox", "--", os.path.basename(shfile.name)],
+    all_run_files = []
+    with contextlib.ExitStack() as stack:
+        for step in pipelines:
+            if "runs" not in step.keys():
+                continue
+            all_run_files.extend(
+                [
+                    stack.enter_context(
+                        tempfile.NamedTemporaryFile(
+                            mode="w",
+                            dir=os.getcwd(),
+                            delete_on_close=False,
+                        ),
+                    ),
+                ],
             )
+        for shfile in all_run_files:
+            shfile.write(step["runs"])
+            shfile.close()
+        subprocess.check_call(
+            ["/usr/bin/shellcheck"]
+            + ["--shell=busybox", "--"]
+            + [os.path.basename(f.name) for f in all_run_files],
+            cwd=os.getcwd(),
+        )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
