@@ -15,4 +15,8 @@
   description: run shellcheck on each "run" step in a melange pipeline
   entry: shellcheck-run-steps
   language: python
-  types: [yaml]
+  stages:
+    - pre-commit
+    - manual
+  types:
+    - yaml
