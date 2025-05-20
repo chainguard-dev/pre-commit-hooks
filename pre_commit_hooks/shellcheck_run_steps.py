@@ -49,6 +49,7 @@ def do_shellcheck(
         if "test" in pkg.keys():
             test_pipeline = pkg["test"].get("pipeline", [])
             pipelines.extend(test_pipeline)
+    name = melange_cfg["package"]["name"]
     all_run_files = []
     with contextlib.ExitStack() as stack:
         for step in pipelines:
@@ -59,6 +60,7 @@ def do_shellcheck(
                     stack.enter_context(
                         tempfile.NamedTemporaryFile(
                             mode="w",
+                            prefix=name,
                             dir=os.getcwd(),
                             delete_on_close=False,
                         ),
