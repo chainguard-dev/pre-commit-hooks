@@ -7,6 +7,7 @@ repos:
     rev: e4f3bba353cc583ce73f660dcf217e245fd681d3
     hooks:
       - id: check-for-epoch-bump
+      - id: shellcheck-run-steps
   - repo: https://github.com/chainguard-dev/yam
     rev: 498642e77997ba79709f43a7ee2c84b12b2145bb # v0.2.12
     hooks:
