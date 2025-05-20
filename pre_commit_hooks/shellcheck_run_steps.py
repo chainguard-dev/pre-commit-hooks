@@ -32,7 +32,10 @@ class Key(NamedTuple):
     unsafe: bool
 
 
-def do_shellcheck(melange_cfg: Mapping[str, Any]) -> None:
+def do_shellcheck(
+    melange_cfg: Mapping[str, Any],
+    shellcheck: list[str],
+) -> None:
     if melange_cfg == {}:
         return
 
@@ -51,13 +54,19 @@ def do_shellcheck(melange_cfg: Mapping[str, Any]) -> None:
         with tempfile.NamedTemporaryFile(mode="w") as shfile:
             shfile.write(step["runs"])
             subprocess.check_call(
-                ["shellcheck", "--shell=busybox", shfile.name],
+                shellcheck + ["--shell=busybox", "--", shfile.name],
             )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("filenames", nargs="*", help="Filenames to check.")
+    parser.add_argument(
+        "--shellcheck",
+        default=["shellcheck"],
+        nargs="*",
+        help="shellcheck command",
+    )
     args = parser.parse_args(argv)
 
     melange_cfg = {}
@@ -82,7 +91,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             try:
                 with open(compiled_out.name) as compiled_in:
                     melange_cfg = yaml.load(compiled_in)
-                    do_shellcheck(melange_cfg)
+                    do_shellcheck(melange_cfg, args.shellcheck)
             except ruamel.yaml.YAMLError as exc:
                 print(exc)
                 return 1
