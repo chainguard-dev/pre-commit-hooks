@@ -5,33 +5,13 @@ import contextlib
 import os
 import subprocess
 import tempfile
-from collections.abc import Generator
 from collections.abc import Mapping
 from collections.abc import Sequence
 from typing import Any
-from typing import NamedTuple
 
 import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="safe")
-
-
-def _exhaust(gen: Generator[str]) -> None:
-    for _ in gen:
-        pass
-
-
-def _parse_unsafe(*args: Any, **kwargs: Any) -> None:
-    _exhaust(yaml.parse(*args, **kwargs))
-
-
-def _load_all(*args: Any, **kwargs: Any) -> None:
-    _exhaust(yaml.load_all(*args, **kwargs))
-
-
-class Key(NamedTuple):
-    multi: bool
-    unsafe: bool
 
 
 def do_shellcheck(
