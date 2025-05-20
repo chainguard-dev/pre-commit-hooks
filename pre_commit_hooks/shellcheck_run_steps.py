@@ -106,10 +106,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 [
                     "melange",
                     "compile",
-                    "--arch",
-                    "x86_64",
-                    "--pipeline-dir",
-                    "./pipelines",
+                    "--arch=x86_64",
+                    "--pipeline-dir=./pipelines",
                     filename,
                 ],
                 stdout=compiled_out,
