@@ -16,3 +16,25 @@ repos:
     hooks:
       - id: ruff-check
       - id: ruff-format
+  - repo: https://github.com/asottile/setup-cfg-fmt
+    rev: 79cc0ae5abfa1ba092b5938cd811a6069710ad77  # frozen: v2.8.0
+    hooks:
+      - id: setup-cfg-fmt
+  - repo: https://github.com/asottile/reorder-python-imports
+    rev: fd0b4e1292716bcd12a396b86af1d1271aaaa62c  # frozen: v3.14.0
+    hooks:
+      - id: reorder-python-imports
+        args: [--py39-plus, --add-import, 'from __future__ import annotations']
+  - repo: https://github.com/asottile/pyupgrade
+    rev: ce40a160603ab0e7d9c627ae33d7ef3906e2d2b2  # frozen: v3.19.1
+    hooks:
+      - id: pyupgrade
+        args: [--py39-plus]
+  - repo: https://github.com/hhatto/autopep8
+    rev: 4046ad49e25b7fa1db275bf66b1b7d60600ac391  # frozen: v2.3.2
+    hooks:
+      - id: autopep8
+  - repo: https://github.com/PyCQA/flake8
+    rev: 4b5e89b4b108a6c1a000c591d334a99a80d34c7b  # frozen: 7.2.0
+    hooks:
+      - id: flake8
