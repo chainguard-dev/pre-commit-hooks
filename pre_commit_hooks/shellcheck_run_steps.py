@@ -50,13 +50,14 @@ def do_shellcheck(
             test_pipeline = pkg["test"].get("pipeline", [])
             pipelines.extend(test_pipeline)
     name = melange_cfg["package"]["name"]
-    all_run_files = []
+    all_steps = []
     with contextlib.ExitStack() as stack:
         for step in pipelines:
             if "runs" not in step.keys():
                 continue
-            all_run_files.extend(
-                [
+            all_steps.append(
+                (
+                    step,
                     stack.enter_context(
                         tempfile.NamedTemporaryFile(
                             mode="w",
@@ -65,15 +66,15 @@ def do_shellcheck(
                             delete_on_close=False,
                         ),
                     ),
-                ],
+                ),
             )
-        for shfile in all_run_files:
+        for step, shfile in all_steps:
             shfile.write(step["runs"])
             shfile.close()
         subprocess.check_call(
             ["/usr/bin/shellcheck"]
             + ["--shell=busybox", "--"]
-            + [os.path.basename(f.name) for f in all_run_files],
+            + [os.path.basename(f.name) for _, f in all_steps],
             cwd=os.getcwd(),
         )
 
