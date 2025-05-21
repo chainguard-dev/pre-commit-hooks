@@ -46,3 +46,7 @@ repos:
     rev: f40886d54c729f533f864ed6ce584e920feb0af7  # frozen: v1.15.0
     hooks:
       - id: mypy
+  - repo: https://github.com/golangci/misspell
+    rev: 528d713e620bdf4b41849db93cb489c4fef9f5c5 # v0.6.0
+    hooks:
+      - id: misspell
