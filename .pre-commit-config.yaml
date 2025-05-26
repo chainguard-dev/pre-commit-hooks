@@ -34,14 +34,6 @@ repos:
     hooks:
       - id: pyupgrade
         args: [--py39-plus]
-  - repo: https://github.com/hhatto/autopep8
-    rev: 4046ad49e25b7fa1db275bf66b1b7d60600ac391  # frozen: v2.3.2
-    hooks:
-      - id: autopep8
-  - repo: https://github.com/PyCQA/flake8
-    rev: 4b5e89b4b108a6c1a000c591d334a99a80d34c7b  # frozen: 7.2.0
-    hooks:
-      - id: flake8
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: f40886d54c729f533f864ed6ce584e920feb0af7  # frozen: v1.15.0
     hooks:
