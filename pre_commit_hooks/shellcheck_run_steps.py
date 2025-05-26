@@ -49,6 +49,8 @@ def do_shellcheck(
                     ),
                 ),
             )
+        if len(all_steps) == 0:
+            return
         for step, shfile in all_steps:
             shfile.write(step["runs"])
             shfile.close()
