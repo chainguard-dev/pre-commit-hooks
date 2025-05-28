@@ -17,6 +17,7 @@ yaml = ruamel.yaml.YAML(typ="safe")
 def do_shellcheck(
     melange_cfg: Mapping[str, Any],
     shellcheck: list[str],
+    shellcheck_args: list[str],
 ) -> None:
     if melange_cfg == {}:
         return
@@ -48,11 +49,14 @@ def do_shellcheck(
                     ),
                 ),
             )
+        if len(all_steps) == 0:
+            return
         for step, shfile in all_steps:
             shfile.write(step["runs"])
             shfile.close()
         subprocess.check_call(
             ["/usr/bin/shellcheck"]
+            + shellcheck_args
             + ["--shell=busybox", "--"]
             + [os.path.basename(f.name) for _, f in all_steps],
             cwd=os.getcwd(),
@@ -61,7 +65,12 @@ def do_shellcheck(
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("filenames", nargs="*", help="Filenames to check.")
+    parser.add_argument(
+        "filenames",
+        nargs="*",
+        help="Filenames to check. You can also pass "
+        "arguments to shellcheck before a '--' separator.",
+    )
     parser.add_argument(
         "--shellcheck",
         default=[
@@ -76,9 +85,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="shellcheck command",
     )
     args = parser.parse_args(argv)
+    try:
+        idx = args.filenames.index("--")
+        shellcheck_args = args.filenames[:idx]
+        filenames = args.filenames[idx + 1 :]
+    except ValueError:
+        shellcheck_args = []
+        filenames = args.filenames
 
     melange_cfg = {}
-    for filename in args.filenames:
+    for filename in filenames:
         with tempfile.NamedTemporaryFile(
             "w",
             delete_on_close=False,
@@ -97,7 +113,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             try:
                 with open(compiled_out.name) as compiled_in:
                     melange_cfg = yaml.load(compiled_in)
-                    do_shellcheck(melange_cfg, args.shellcheck)
+                    do_shellcheck(
+                        melange_cfg,
+                        args.shellcheck,
+                        shellcheck_args,
+                    )
             except ruamel.yaml.YAMLError as exc:
                 print(exc)
                 return 1
