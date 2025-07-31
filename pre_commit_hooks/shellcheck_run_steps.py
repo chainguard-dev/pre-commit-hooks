@@ -58,7 +58,7 @@ def do_shellcheck(
             shfile.write(step["runs"])
             shfile.close()
         subprocess.check_call(
-            ["/usr/bin/shellcheck"]
+            shellcheck
             + shellcheck_args
             + ["--shell=busybox", "--"]
             + [os.path.basename(f.name) for _, f in all_steps],
