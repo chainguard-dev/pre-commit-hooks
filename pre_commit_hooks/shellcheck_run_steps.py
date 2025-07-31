@@ -81,7 +81,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             "run",
             f"--volume={os.getcwd()}:/mnt",
             "--rm",
-            "-it",
             DefaultShellCheckImage,
         ],
         nargs="*",
