@@ -43,3 +43,4 @@ repos:
     rev: 528d713e620bdf4b41849db93cb489c4fef9f5c5 # v0.6.0
     hooks:
       - id: misspell
+        exclude: '^example\.pre-commit-config\.yaml$'

@@ -13,6 +13,10 @@ import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="safe")
 
+# Please provide the output of `grype koalaman/shellcheck@sha256:<newhash>`
+# in your PR when bumping. Referenced by SHA for safety.
+DefaultShellCheckImage = "koalaman/shellcheck@sha256:652a5a714dc2f5f97e36f565d4f7d2322fea376734f3ec1b04ed54ce2a0b124f"
+
 
 def do_shellcheck(
     melange_cfg: Mapping[str, Any],
@@ -55,7 +59,7 @@ def do_shellcheck(
             shfile.write(step["runs"])
             shfile.close()
         subprocess.check_call(
-            ["/usr/bin/shellcheck"]
+            shellcheck
             + shellcheck_args
             + ["--shell=busybox", "--"]
             + [os.path.basename(f.name) for _, f in all_steps],
@@ -68,8 +72,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "filenames",
         nargs="*",
-        help="Filenames to check. You can also pass "
-        "arguments to shellcheck before a '--' separator.",
+        metavar="[-- SHELLCHECK ARGS -- ] FILENAMES",
     )
     parser.add_argument(
         "--shellcheck",
@@ -79,7 +82,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"--volume={os.getcwd()}:/mnt",
             "--rm",
             "-it",
-            "koalaman/shellcheck:latest",
+            DefaultShellCheckImage,
         ],
         nargs="*",
         help="shellcheck command",
