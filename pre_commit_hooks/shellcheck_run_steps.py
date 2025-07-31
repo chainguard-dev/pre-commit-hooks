@@ -18,13 +18,14 @@ yaml = ruamel.yaml.YAML(typ="safe")
 DefaultShellCheckImage = "koalaman/shellcheck@sha256:652a5a714dc2f5f97e36f565d4f7d2322fea376734f3ec1b04ed54ce2a0b124f"
 
 
+# Returns False if shellcheck reports issues
 def do_shellcheck(
     melange_cfg: Mapping[str, Any],
     shellcheck: list[str],
     shellcheck_args: list[str],
-) -> None:
+) -> bool:
     if melange_cfg == {}:
-        return
+        return True
 
     pkgs = [melange_cfg]
     pkgs.extend(melange_cfg.get("subpackages", []))
@@ -54,17 +55,22 @@ def do_shellcheck(
                 ),
             )
         if len(all_steps) == 0:
-            return
+            return True
         for step, shfile in all_steps:
             shfile.write(step["runs"])
             shfile.close()
-        subprocess.check_call(
-            shellcheck
-            + shellcheck_args
-            + ["--shell=busybox", "--"]
-            + [os.path.basename(f.name) for _, f in all_steps],
-            cwd=os.getcwd(),
-        )
+        try:
+            subprocess.check_call(
+                shellcheck
+                + shellcheck_args
+                + ["--shell=busybox", "--"]
+                + [os.path.basename(f.name) for _, f in all_steps],
+                cwd=os.getcwd(),
+            )
+        except subprocess.CalledProcessError:
+            return False
+
+    return True
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -95,6 +101,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         shellcheck_args = []
         filenames = args.filenames
 
+    fail_cnt = 0
     melange_cfg = {}
     for filename in filenames:
         with tempfile.NamedTemporaryFile(
@@ -115,17 +122,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             try:
                 with open(compiled_out.name) as compiled_in:
                     melange_cfg = yaml.load(compiled_in)
-                    do_shellcheck(
+                    if not do_shellcheck(
                         melange_cfg,
                         args.shellcheck,
                         shellcheck_args,
-                    )
+                    ):
+                        fail_cnt += 1
             except ruamel.yaml.YAMLError as exc:
                 print(exc)
-                return 1
+                fail_cnt += 1
 
-    return 0
+    return fail_cnt
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    fail_cnt = main()
+    exit_code = 0
+    if fail_cnt != 0:
+        exit_code = 1
+
+    raise SystemExit(exit_code)
