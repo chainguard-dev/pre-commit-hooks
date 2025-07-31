@@ -31,7 +31,7 @@ repos:
               .*\.diff
           )$
   - repo: https://github.com/wolfi-dev/wolfictl
-    rev: ddadb9365d6d78ee33e13801b12eabfcb04298a7 # 2025-06-20
+    rev: 4be5d200e3c592e46686bcd50aab54e1064eb025 # frozen: v0.38.6
     hooks:
       - id: wolfictl-lint
   - repo: https://github.com/golangci/misspell
