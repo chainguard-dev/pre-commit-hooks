@@ -13,6 +13,9 @@ import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="safe")
 
+# Reference by SHA for safety
+DefaultShellCheckImage = "koalaman/shellcheck@sha256:652a5a714dc2f5f97e36f565d4f7d2322fea376734f3ec1b04ed54ce2a0b124f"
+
 
 def do_shellcheck(
     melange_cfg: Mapping[str, Any],
@@ -79,7 +82,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"--volume={os.getcwd()}:/mnt",
             "--rm",
             "-it",
-            "koalaman/shellcheck:latest",
+            DefaultShellCheckImage,
         ],
         nargs="*",
         help="shellcheck command",
