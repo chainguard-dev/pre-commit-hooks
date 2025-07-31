@@ -71,8 +71,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "filenames",
         nargs="*",
-        help="Filenames to check. You can also pass "
-        "arguments to shellcheck before a '--' separator.",
+        metavar="[-- SHELLCHECK ARGS -- ] FILENAMES",
     )
     parser.add_argument(
         "--shellcheck",
