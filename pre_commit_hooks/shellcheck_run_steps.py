@@ -119,6 +119,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "compile",
                     f"--arch={os.uname().machine}",
                     "--pipeline-dir=./pipelines",
+                    filename,
                 ],
                 stdout=compiled_out,
             )
