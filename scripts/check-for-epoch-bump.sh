@@ -10,11 +10,21 @@ if [ "$#" -lt 1 ]; then
     exit 1
 fi
 
+epoch_grep() {
+    grep -E '^[[:space:]]+epoch:'
+}
+
+epoch_sed() {
+    sed -r 's/^[[:space:]]+epoch:[[:space:]]+([0-9])+/\1/'
+}
+
 for yaml_file in "$@"; do
     echo "Checking $yaml_file:"
 
     # Extract the epoch from the current file using grep and sed
-    epoch_local=$(grep -E '^[[:space:]]*epoch:' "$yaml_file" | sed 's/.*epoch:[[:space:]]*//')
+    # (not assuming `yq` is available)
+    epoch_line="$(epoch_grep < "$yaml_file")"
+    epoch_local="$(echo "$epoch_line" | epoch_sed)"
     if [ -z "$epoch_local" ]; then
         echo "Warning: 'epoch' field not found in $yaml_file"
         echo ""
@@ -22,7 +32,8 @@ for yaml_file in "$@"; do
     fi
 
     # Extract the epoch from the file on the main branch using git show
-    epoch_main=$(git show main:"$yaml_file" 2>/dev/null | grep -E '^[[:space:]]*epoch:' | sed 's/.*epoch:[[:space:]]*//')
+    epoch_main_line="$(git show main:"$yaml_file" 2>/dev/null | epoch_grep)"
+    epoch_main="$(echo "$epoch_main_line" | epoch_sed)"
     if [ -z "$epoch_main" ]; then
         echo "Warning: 'epoch' field not found in $yaml_file on branch 'main'"
         echo ""
