@@ -109,20 +109,45 @@ def main(argv: Sequence[str] | None = None) -> int:
             "w",
             delete_on_close=False,
         ) as compiled_out:
-            subprocess.check_call(
-                [
-                    "docker",
-                    "run",
-                    f"--volume={os.getcwd()}:/work",
-                    "--rm",
-                    MelangeImage,
-                    "compile",
-                    f"--arch={os.uname().machine}",
-                    "--pipeline-dir=./pipelines",
-                    filename,
-                ],
-                stdout=compiled_out,
-            )
+            # Try multiple architectures
+            architectures = list(dict.fromkeys([os.uname().machine, 'x86_64', 'aarch64']))
+            compilation_succeeded = False
+
+            for i, arch in enumerate(architectures):
+                try:
+                    subprocess.run(
+                        [
+                            "docker",
+                            "run",
+                            f"--volume={os.getcwd()}:/work",
+                            "--rm",
+                            MelangeImage,
+                            "compile",
+                            f"--arch={arch}",
+                            "--pipeline-dir=./pipelines",
+                            filename,
+                        ],
+                        stdout=compiled_out,
+                        stderr=subprocess.PIPE,
+                        check=True,
+                        text=True
+                    )
+                    compilation_succeeded = True
+                    break  # Success, exit the architecture loop
+                except subprocess.CalledProcessError as e:
+                    if i < len(architectures) - 1: 
+                        # Reset the file for the next attempt
+                        compiled_out.seek(0)
+                        compiled_out.truncate()
+                        continue
+                    else:
+                        # Last architecture failed, propagate the error
+                        raise
+
+            if not compilation_succeeded:
+                fail_cnt += 1
+                continue
+
             compiled_out.close()
             try:
                 with open(compiled_out.name) as compiled_in:
