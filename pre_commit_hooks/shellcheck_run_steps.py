@@ -110,7 +110,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             delete_on_close=False,
         ) as compiled_out:
             # Try multiple architectures
-            architectures = list(dict.fromkeys([os.uname().machine, 'x86_64', 'aarch64']))
+            architectures = list(
+                dict.fromkeys([os.uname().machine, "x86_64", "aarch64"]),
+            )
             compilation_succeeded = False
 
             for i, arch in enumerate(architectures):
@@ -130,12 +132,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                         stdout=compiled_out,
                         stderr=subprocess.PIPE,
                         check=True,
-                        text=True
+                        text=True,
                     )
                     compilation_succeeded = True
                     break  # Success, exit the architecture loop
-                except subprocess.CalledProcessError as e:
-                    if i < len(architectures) - 1: 
+                except subprocess.CalledProcessError:
+                    if i < len(architectures) - 1:
                         # Reset the file for the next attempt
                         compiled_out.seek(0)
                         compiled_out.truncate()
