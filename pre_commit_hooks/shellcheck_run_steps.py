@@ -109,47 +109,26 @@ def main(argv: Sequence[str] | None = None) -> int:
             "w",
             delete_on_close=False,
         ) as compiled_out:
-            # Try multiple architectures
-            architectures = list(
-                dict.fromkeys([os.uname().machine, "x86_64", "aarch64"]),
+            with open(filename) as precompiled_in:
+                melange_cfg = yaml.load(precompiled_in)
+                architectures = melange_cfg["package"].get("target-architecture", [])
+                if not architectures:
+                    architectures = ["x86_64"]
+            arch = architectures[0]
+            subprocess.check_call(
+                [
+                    "docker",
+                    "run",
+                    f"--volume={os.getcwd()}:/work",
+                    "--rm",
+                    MelangeImage,
+                    "compile",
+                    f"--arch={arch}",
+                    "--pipeline-dir=./pipelines",
+                    filename,
+                ],
+                stdout=compiled_out,
             )
-            compilation_succeeded = False
-
-            for i, arch in enumerate(architectures):
-                try:
-                    subprocess.run(
-                        [
-                            "docker",
-                            "run",
-                            f"--volume={os.getcwd()}:/work",
-                            "--rm",
-                            MelangeImage,
-                            "compile",
-                            f"--arch={arch}",
-                            "--pipeline-dir=./pipelines",
-                            filename,
-                        ],
-                        stdout=compiled_out,
-                        stderr=subprocess.PIPE,
-                        check=True,
-                        text=True,
-                    )
-                    compilation_succeeded = True
-                    break  # Success, exit the architecture loop
-                except subprocess.CalledProcessError:
-                    if i < len(architectures) - 1:
-                        # Reset the file for the next attempt
-                        compiled_out.seek(0)
-                        compiled_out.truncate()
-                        continue
-                    else:
-                        # Last architecture failed, propagate the error
-                        raise
-
-            if not compilation_succeeded:
-                fail_cnt += 1
-                continue
-
             compiled_out.close()
             try:
                 with open(compiled_out.name) as compiled_in:
