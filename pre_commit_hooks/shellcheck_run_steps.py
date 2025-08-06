@@ -109,6 +109,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             "w",
             delete_on_close=False,
         ) as compiled_out:
+            with open(filename) as precompiled_in:
+                melange_cfg = yaml.load(precompiled_in)
+                arch = melange_cfg["package"].get("target-architecture", ["x86_64"])[0]
             subprocess.check_call(
                 [
                     "docker",
@@ -117,7 +120,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "--rm",
                     MelangeImage,
                     "compile",
-                    f"--arch={os.uname().machine}",
+                    f"--arch={arch}",
                     "--pipeline-dir=./pipelines",
                     filename,
                 ],
