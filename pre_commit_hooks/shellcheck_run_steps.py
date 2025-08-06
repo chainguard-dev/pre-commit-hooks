@@ -111,10 +111,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ) as compiled_out:
             with open(filename) as precompiled_in:
                 melange_cfg = yaml.load(precompiled_in)
-                architectures = melange_cfg["package"].get("target-architecture", [])
-                if not architectures:
-                    architectures = ["x86_64"]
-            arch = architectures[0]
+                arch = melange_cfg["package"].get("target-architecture", ["x86_64"])[0]
             subprocess.check_call(
                 [
                     "docker",
