@@ -33,6 +33,10 @@
   name: check pipeline name-only steps
   description: check that pipeline steps don't have only a name without uses or other details
   entry: check-pipeline-name-only-steps
+- id: check-for-go-fips-test
+  name: check for go-fips test
+  description: Check that packages using go-fips have corresponding go-fips tests
+  entry: check-for-go-fips-test
   language: python
   stages:
     - pre-commit
