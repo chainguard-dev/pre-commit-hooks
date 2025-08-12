@@ -79,7 +79,11 @@ def check_go_fips_compliance(melange_cfg: dict[str, Any]) -> tuple[bool, list[st
                 subpkg_has_emptypackage_test = True
 
         # If subpackage has emptypackage test, it doesn't need go-fips test
-        if subpkg_uses_fips and not subpkg_has_test and not subpkg_has_emptypackage_test:
+        if (
+            subpkg_uses_fips
+            and not subpkg_has_test
+            and not subpkg_has_emptypackage_test
+        ):
             issues.append(
                 f"subpackage '{subpkg_name}' uses go-fips but lacks test/go-fips-check",
             )
