@@ -42,12 +42,15 @@ def check_go_fips_compliance(melange_cfg: dict[str, Any]) -> tuple[bool, list[st
     # Check main test section
     test_section = melange_cfg.get("test", {})
     test_pipelines = test_section.get("pipeline", [])
+    main_has_emptypackage_test = False
     for step in test_pipelines:
         if step.get("uses") == "test/go-fips-check":
             main_has_test = True
-            break
+        elif step.get("uses") == "test/emptypackage":
+            main_has_emptypackage_test = True
 
-    if main_uses_fips and not main_has_test:
+    # If main package has emptypackage test, it doesn't need go-fips test
+    if main_uses_fips and not main_has_test and not main_has_emptypackage_test:
         issues.append("main package uses go-fips but lacks test/go-fips-check")
 
     # Check each subpackage
@@ -68,12 +71,15 @@ def check_go_fips_compliance(melange_cfg: dict[str, Any]) -> tuple[bool, list[st
         # Check subpackage test sections
         subpkg_test_section = subpkg.get("test", {})
         subpkg_test_pipelines = subpkg_test_section.get("pipeline", [])
+        subpkg_has_emptypackage_test = False
         for step in subpkg_test_pipelines:
             if step.get("uses") == "test/go-fips-check":
                 subpkg_has_test = True
-                break
+            elif step.get("uses") == "test/emptypackage":
+                subpkg_has_emptypackage_test = True
 
-        if subpkg_uses_fips and not subpkg_has_test:
+        # If subpackage has emptypackage test, it doesn't need go-fips test
+        if subpkg_uses_fips and not subpkg_has_test and not subpkg_has_emptypackage_test:
             issues.append(
                 f"subpackage '{subpkg_name}' uses go-fips but lacks test/go-fips-check",
             )
