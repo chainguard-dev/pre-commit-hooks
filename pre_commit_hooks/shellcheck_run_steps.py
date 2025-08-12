@@ -86,7 +86,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=[
             "docker",
             "run",
-            f"--volume={os.getcwd()}:/mnt",
+            f"--volume={os.getcwd()}:/mnt:Z",
             "--rm",
             DefaultShellCheckImage,
         ],
@@ -116,7 +116,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 [
                     "docker",
                     "run",
-                    f"--volume={os.getcwd()}:/work",
+                    f"--volume={os.getcwd()}:/work:Z",
                     "--rm",
                     MelangeImage,
                     "compile",
