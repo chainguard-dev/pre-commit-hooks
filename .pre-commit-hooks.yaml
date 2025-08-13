@@ -20,3 +20,13 @@
     - manual
   types:
     - yaml
+- id: check-pipeline-name-only-steps
+  name: check pipeline name-only steps
+  description: check that pipeline steps don't have only a name without uses or other details
+  entry: check-pipeline-name-only-steps
+  language: python
+  stages:
+    - pre-commit
+    - manual
+  types:
+    - yaml
