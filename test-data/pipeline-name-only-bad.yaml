@@ -1,0 +1,38 @@
+package:
+  name: test-package
+  version: "1.0.0"
+  epoch: 0
+  description: "Test package with incorrectly formatted pipeline steps"
+  copyright:
+    - license: Apache-2.0
+
+environment:
+  contents:
+    packages:
+      - busybox
+
+pipeline:
+  - name: test/go-fips-check  # BAD: This should be 'uses' not 'name'
+  - name: "Configure build"
+    uses: autoconf/configure
+    with:
+      opts: --enable-shared
+  - uses: autoconf/make
+
+test:
+  pipeline:
+    - name: run-tests  # BAD: Only has name, no uses
+    - uses: test/daemon-check-output
+      with:
+        expected_output: |
+          Server started
+
+subpackages:
+  - name: test-subpkg
+    description: "Subpackage with bad pipeline"
+    pipeline:
+      - name: bad-subpkg-step  # BAD: Only has name
+      - uses: split/dev
+    test:
+      pipeline:
+        - name: subpkg-test-step  # BAD: Only has name in test section
