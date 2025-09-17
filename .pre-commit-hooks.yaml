@@ -20,3 +20,12 @@
     - manual
   types:
     - yaml
+- id: check-restored-packages
+  name: Check restored packages against withdrawn
+  description: Ensures packages being added to restored-packages.txt are removed from withdrawn-packages.txt first
+  entry: scripts/check-restored-packages.sh
+  language: script
+  stages:
+    - pre-commit
+    - manual
+  files: ^restored-packages\.txt$
