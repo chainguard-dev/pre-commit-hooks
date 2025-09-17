@@ -1,12 +1,12 @@
 #!/bin/bash
 set -e
 
-# Check if restored-packages.txt is being modified
-if ! git diff --cached --name-only | grep -q "restored-packages.txt"; then
+if [ ! -f "withdrawn-packages.txt" ] || [ ! -f "restored-packages.txt" ]; then
     exit 0
 fi
 
-if [ ! -f "withdrawn-packages.txt" ] || [ ! -f "restored-packages.txt" ]; then
+# Check if restored-packages.txt is being modified
+if ! git diff --cached --name-only | grep -q "restored-packages.txt"; then
     exit 0
 fi
 
