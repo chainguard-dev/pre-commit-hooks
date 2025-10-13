@@ -16,7 +16,7 @@ yaml = ruamel.yaml.YAML(typ="safe")
 # Please provide the output of `grype koalaman/shellcheck@sha256:<newhash>`
 # in your PR when bumping. Referenced by SHA for safety.
 DefaultShellCheckImage = "koalaman/shellcheck@sha256:652a5a714dc2f5f97e36f565d4f7d2322fea376734f3ec1b04ed54ce2a0b124f"
-MelangeImage = "cgr.dev/chainguard/melange:latest"
+MelangeImage = "cgr.dev/chainguard/melange:0.31.6"
 
 
 # Returns False if shellcheck reports issues
