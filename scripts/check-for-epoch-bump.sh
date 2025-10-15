@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Areas of possible improvement: 
+# Areas of possible improvement:
 # Check the git remotes to see if this is a package repo
-# Exclude certain filenames like "pombump-deps.yaml", related. Probably could be done in the hook config or in the loop. 
+# Exclude certain filenames like "pombump-deps.yaml", related. Probably could be done in the hook config or in the loop.
 
 # Check for at least one argument
 if [ "$#" -lt 1 ]; then
@@ -15,7 +15,7 @@ epoch_grep() {
 }
 
 epoch_sed() {
-    sed -r 's/^[[:space:]]+epoch:[[:space:]]+([0-9])+/\1/'
+    sed -r 's/^[[:space:]]+epoch:[[:space:]]+([0-9])+.*$/\1/'
 }
 
 for yaml_file in "$@"; do
