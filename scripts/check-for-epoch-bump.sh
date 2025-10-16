@@ -15,7 +15,7 @@ epoch_grep() {
 }
 
 epoch_sed() {
-    sed -r 's/^[[:space:]]+epoch:[[:space:]]+([0-9])+.*$/\1/'
+    sed -r 's/^[[:space:]]+epoch:[[:space:]]+([0-9]+).*$/\1/'
 }
 
 for yaml_file in "$@"; do
