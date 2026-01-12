@@ -122,7 +122,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     MelangeImage,
                     "compile",
                     f"--arch={arch}",
-                    "--pipeline-dir=./pipelines",
+                    f"--pipeline-dir=./{os.path.dirname(filename)}/pipelines",
                     filename,
                 ],
                 stdout=compiled_out,
