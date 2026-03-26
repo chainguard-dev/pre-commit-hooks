@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import json
 import os
 import subprocess
+import sys
 import tempfile
+import time
 from collections.abc import Mapping
 from collections.abc import Sequence
+from datetime import datetime
+from datetime import timezone
 from typing import Any
 
 import ruamel.yaml
@@ -74,7 +79,61 @@ def do_shellcheck(
     return True
 
 
+def check_and_update_melange_image(image: str) -> None:
+    """Check if melange image is older than 30 days and pull if needed."""
+    try:
+        # Get image creation date
+        result = subprocess.run(
+            ["docker", "image", "inspect", image, "--format", "{{json .Created}}"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        if result.returncode != 0:
+            # Image doesn't exist locally, pull it
+            print(
+                f"Melange image not found locally, pulling {image}...",
+                file=sys.stderr,
+            )
+            subprocess.run(["docker", "pull", image], check=True)
+            return
+
+        # Parse the creation date
+        created_str = json.loads(result.stdout.strip())
+        created_date = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        age_days = (now - created_date).days
+
+        if age_days > 30:
+            print(
+                f"⚠️  Melange image is {age_days} days old (created {created_date.strftime('%Y-%m-%d')})",
+                file=sys.stderr,
+            )
+            print(f"⚠️  Pulling updated melange image: {image}", file=sys.stderr)
+            print(
+                "⚠️  Press Ctrl+C now to abort or wait 15 seconds to continue...",
+                file=sys.stderr,
+            )
+
+            # Give user 15 seconds to abort
+            time.sleep(15)
+
+            print(f"Pulling {image}...", file=sys.stderr)
+            subprocess.run(["docker", "pull", image], check=True)
+            print("✓ Melange image updated successfully", file=sys.stderr)
+
+    except KeyboardInterrupt:
+        print("\n⚠️  Update aborted by user, using existing image", file=sys.stderr)
+    except Exception as e:
+        print(f"Warning: Failed to check/update melange image: {e}", file=sys.stderr)
+        print("Continuing with existing image...", file=sys.stderr)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
+    # Check and update melange image if needed
+    check_and_update_melange_image(MelangeImage)
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "filenames",
