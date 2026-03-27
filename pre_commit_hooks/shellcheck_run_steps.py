@@ -5,9 +5,7 @@ import contextlib
 import json
 import os
 import subprocess
-import sys
 import tempfile
-import time
 from collections.abc import Mapping
 from collections.abc import Sequence
 from datetime import datetime
@@ -92,11 +90,11 @@ def check_and_update_melange_image(image: str) -> None:
 
         if result.returncode != 0:
             # Image doesn't exist locally, pull it
-            print(
-                f"Melange image not found locally, pulling {image}...",
-                file=sys.stderr,
+            subprocess.run(
+                ["docker", "pull", image],
+                check=True,
+                capture_output=True,
             )
-            subprocess.run(["docker", "pull", image], check=True)
             return
 
         # Parse the creation date
@@ -106,28 +104,16 @@ def check_and_update_melange_image(image: str) -> None:
         age_days = (now - created_date).days
 
         if age_days > 30:
-            print(
-                f"⚠️  Melange image is {age_days} days old (created {created_date.strftime('%Y-%m-%d')})",
-                file=sys.stderr,
-            )
-            print(f"⚠️  Pulling updated melange image: {image}", file=sys.stderr)
-            print(
-                "⚠️  Press Ctrl+C now to abort or wait 15 seconds to continue...",
-                file=sys.stderr,
+            # Pull updated image
+            subprocess.run(
+                ["docker", "pull", image],
+                check=True,
+                capture_output=True,
             )
 
-            # Give user 15 seconds to abort
-            time.sleep(15)
-
-            print(f"Pulling {image}...", file=sys.stderr)
-            subprocess.run(["docker", "pull", image], check=True)
-            print("✓ Melange image updated successfully", file=sys.stderr)
-
-    except KeyboardInterrupt:
-        print("\n⚠️  Update aborted by user, using existing image", file=sys.stderr)
     except Exception as e:
-        print(f"Warning: Failed to check/update melange image: {e}", file=sys.stderr)
-        print("Continuing with existing image...", file=sys.stderr)
+        # Print warning to stdout (like epoch check does with echo)
+        print(f"Warning: Failed to check/update melange image: {e}")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
