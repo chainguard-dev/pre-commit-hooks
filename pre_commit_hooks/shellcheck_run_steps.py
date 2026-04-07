@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import json
 import os
 import subprocess
 import tempfile
 from collections.abc import Mapping
 from collections.abc import Sequence
+from datetime import datetime
+from datetime import timezone
 from typing import Any
 
 import ruamel.yaml
@@ -75,7 +78,49 @@ def do_shellcheck(
     return True
 
 
+def check_and_update_melange_image(image: str) -> None:
+    """Check if melange image is older than 30 days and pull if needed."""
+    try:
+        # Get image creation date
+        result = subprocess.run(
+            ["docker", "image", "inspect", image, "--format", "{{json .Created}}"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        if result.returncode != 0:
+            # Image doesn't exist locally, pull it
+            subprocess.run(
+                ["docker", "pull", image],
+                check=True,
+                capture_output=True,
+            )
+            return
+
+        # Parse the creation date
+        created_str = json.loads(result.stdout.strip())
+        created_date = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        age_days = (now - created_date).days
+
+        if age_days > 30:
+            # Pull updated image
+            subprocess.run(
+                ["docker", "pull", image],
+                check=True,
+                capture_output=True,
+            )
+
+    except Exception as e:
+        # Print warning to stdout (like epoch check does with echo)
+        print(f"Warning: Failed to check/update melange image: {e}")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
+    # Check and update melange image if needed
+    check_and_update_melange_image(MelangeImage)
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "filenames",
