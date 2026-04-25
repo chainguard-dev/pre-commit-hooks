@@ -45,7 +45,19 @@ for yaml_file in "$@"; do
 
     # Extract version and epoch from the file on the main branch using git show
     # Treat missing file as version 0 and epoch 0
-    main_content="$(git show main:"$yaml_file" 2>/dev/null)"
+    # Try all three known package directories so epoch bumps are enforced when
+    # a package is moved between os/, enterprise-packages/, and extra-packages/.
+    first_component="${yaml_file%%/*}"
+    rest_of_path="${yaml_file#*/}"
+    main_content=""
+    if [[ "$first_component" == "os" || "$first_component" == "enterprise-packages" || "$first_component" == "extra-packages" ]]; then
+        for prefix in "os" "enterprise-packages" "extra-packages"; do
+            main_content="$(git show main:"${prefix}/${rest_of_path}" 2>/dev/null)"
+            [ -n "$main_content" ] && break
+        done
+    else
+        main_content="$(git show main:"$yaml_file" 2>/dev/null)"
+    fi
     if [ -z "$main_content" ]; then
         version_main="0"
         epoch_main="0"
