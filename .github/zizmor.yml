@@ -1,0 +1,5 @@
+rules:
+  # Cosmetic pedantic-only finding (zizmor concurrency-limits) — low
+  # security value; suppressed at the repo level per campaign convention.
+  concurrency-limits:
+    disable: true
