@@ -19,6 +19,27 @@ DefaultShellCheckImage = "koalaman/shellcheck@sha256:652a5a714dc2f5f97e36f565d4f
 # 0.31.6 pinning to resolve var-transforms linting error
 MelangeImage = "cgr.dev/chainguard/melange:latest"
 
+# Pipeline directories per package tier, matching stereo's dirToPipelineDirs.
+# Paths are relative to the repo root (the Docker /work mount).
+PIPELINE_DIRS: dict[str, list[str]] = {
+    "os/": ["./os/pipelines/"],
+    "extra-packages/": ["./extra-packages/pipelines/", "./pipelines/os"],
+    "enterprise-packages/": [
+        "./enterprise-packages/pipelines/",
+        "./pipelines/",
+        "./pipelines/os",
+    ],
+}
+
+
+def _pipeline_dirs_for(filename: str) -> list[str]:
+    """Return the --pipeline-dir flags appropriate for *filename*."""
+    for prefix, dirs in PIPELINE_DIRS.items():
+        if filename.startswith(prefix):
+            return [f"--pipeline-dir={d}" for d in dirs]
+    # Fallback: derive from the file's own directory (original behaviour).
+    return [f"--pipeline-dir=./{os.path.dirname(filename)}/pipelines"]
+
 
 # Returns False if shellcheck reports issues
 def do_shellcheck(
@@ -122,7 +143,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     MelangeImage,
                     "compile",
                     f"--arch={arch}",
-                    f"--pipeline-dir=./{os.path.dirname(filename)}/pipelines",
+                    *_pipeline_dirs_for(filename),
                     filename,
                 ],
                 stdout=compiled_out,
