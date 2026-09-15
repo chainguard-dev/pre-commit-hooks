@@ -33,12 +33,16 @@ PIPELINE_DIRS: dict[str, list[str]] = {
 
 
 def _pipeline_dirs_for(filename: str) -> list[str]:
-    """Return the --pipeline-dir flags appropriate for *filename*."""
+    """Return the --pipeline-dirs flag appropriate for *filename*.
+
+    `melange compile` reads only the last of repeated --pipeline-dir flags,
+    so the directories go in a single comma-separated --pipeline-dirs.
+    """
     for prefix, dirs in PIPELINE_DIRS.items():
         if filename.startswith(prefix):
-            return [f"--pipeline-dir={d}" for d in dirs]
+            return [f"--pipeline-dirs={','.join(dirs)}"]
     # Fallback: derive from the file's own directory (original behaviour).
-    return [f"--pipeline-dir=./{os.path.dirname(filename)}/pipelines"]
+    return [f"--pipeline-dirs=./{os.path.dirname(filename)}/pipelines"]
 
 
 # Returns False if shellcheck reports issues
