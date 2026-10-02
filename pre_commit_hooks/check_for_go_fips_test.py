@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import re
 import sys
+from collections.abc import Iterator
 from collections.abc import Sequence
 from typing import Any
 
@@ -9,91 +11,156 @@ import ruamel.yaml
 
 yaml = ruamel.yaml.YAML(typ="safe")
 
+# Go toolchain packages that imply a FIPS build, matched as prefixes against
+# environment packages and `go-package:` inputs (go-fips, go-fips-md5-1.25, ...).
+FIPS_GO_PREFIXES = ("go-fips",)
 
-def check_go_fips_compliance(melange_cfg: dict[str, Any]) -> tuple[bool, list[str]]:
+# Pipelines that install the toolchain named by their `go-package` input.
+GO_PIPELINES_WITH_TOOLCHAIN_INPUT = frozenset({"go/build", "go/install"})
+# Pipelines that build with whatever `go` the build environment provides.
+GO_PIPELINES_FROM_ENVIRONMENT = frozenset({"go/build/v2"})
+# `runs:` blocks that call the compiler directly also use the environment's go.
+GO_BUILD_COMMAND = re.compile(r"\bgo\s+(build|install)\b")
+
+FIPS_TEST = "test/go-fips-check"
+EMPTY_PACKAGE_TESTS = frozenset({"test/emptypackage", "test/tw/emptypackage"})
+# Moves the main package's binaries into a subpackage, which then owns the test.
+SPLIT_BIN = "split/bin"
+
+
+def iter_steps(steps: Any) -> Iterator[dict[str, Any]]:
+    """Yield every dict step in *steps*, descending into nested ``pipeline:`` lists."""
+    for step in steps or []:
+        if not isinstance(step, dict):
+            continue
+        yield step
+        yield from iter_steps(step.get("pipeline"))
+
+
+def uses_any(steps: Any, pipelines: frozenset[str]) -> bool:
+    return any(step.get("uses") in pipelines for step in iter_steps(steps))
+
+
+def is_fips_toolchain(package: Any) -> bool:
+    return isinstance(package, str) and package.startswith(FIPS_GO_PREFIXES)
+
+
+def environment_packages(scope: dict[str, Any]) -> list[Any]:
+    """Packages listed under ``environment.contents.packages`` of *scope*."""
+    env = scope.get("environment") or {}
+    contents = (env.get("contents") or {}) if isinstance(env, dict) else {}
+    packages = contents.get("packages") if isinstance(contents, dict) else None
+    return list(packages or [])
+
+
+def test_steps(scope: dict[str, Any]) -> list[Any]:
+    test = scope.get("test") or {}
+    return list(test.get("pipeline") or []) if isinstance(test, dict) else []
+
+
+def builds_with_fips(steps: Any, env_has_fips_go: bool) -> bool:
+    """Whether *steps* compile Go with a FIPS toolchain.
+
+    `go/build` and `go/install` say so explicitly through `go-package`.
+    `go/build/v2` and hand-written `go build` lines use the environment's go,
+    so they count only when the environment provides a FIPS toolchain.
     """
-    Check if all go-fips usages have corresponding tests.
-    Returns (is_compliant, list_of_missing_tests).
+    for step in iter_steps(steps):
+        uses = step.get("uses")
+        if uses in GO_PIPELINES_WITH_TOOLCHAIN_INPUT:
+            inputs = step.get("with") or {}
+            if is_fips_toolchain(inputs.get("go-package")):
+                return True
+        elif uses in GO_PIPELINES_FROM_ENVIRONMENT:
+            if env_has_fips_go:
+                return True
+        elif env_has_fips_go and isinstance(step.get("runs"), str):
+            if GO_BUILD_COMMAND.search(step["runs"]):
+                return True
+    return False
+
+
+def installed_in_main_test(melange_cfg: dict[str, Any], subpkg_name: str) -> bool:
+    """Whether the main test environment installs *subpkg_name*.
+
+    Names are compared before template expansion. For range subpackages the
+    part before ``${{range.key}}`` is matched as a prefix, so a main test that
+    installs ``${{package.name}}-controller`` covers
+    ``${{package.name}}-${{range.key}}``.
+    """
+    test = melange_cfg.get("test") or {}
+    packages = environment_packages(test) if isinstance(test, dict) else []
+    if subpkg_name in packages:
+        return True
+    prefix, sep, _ = subpkg_name.partition("${{range.key}}")
+    return bool(sep and prefix) and any(
+        isinstance(p, str) and p.startswith(prefix) for p in packages
+    )
+
+
+def check_go_fips_compliance(melange_cfg: dict[str, Any]) -> list[str]:
+    """Return a message for every package or subpackage that builds Go with a
+    FIPS toolchain and has no test/go-fips-check covering it.
+
+    Coverage is the scope's own test pipeline, an empty-package test (nothing
+    to check), or for subpackages the main test pipeline when it both runs
+    test/go-fips-check and installs the subpackage.
     """
     issues = []
-
-    # Check if main package uses go-fips
-    main_uses_fips = False
-    main_has_test = False
-
-    # Check environment packages for any go-fips variant
-    env_packages = (
-        melange_cfg.get("environment", {}).get("contents", {}).get("packages", [])
+    env_has_fips_go = any(
+        is_fips_toolchain(p) for p in environment_packages(melange_cfg)
     )
-    for pkg in env_packages:
-        if pkg.startswith("go-fips"):
-            main_uses_fips = True
-            break
+    subpackages = [
+        s for s in melange_cfg.get("subpackages") or [] if isinstance(s, dict)
+    ]
 
-    # Check main pipeline steps for go/build with go-package: go-fips*
-    pipelines = melange_cfg.get("pipeline", [])
-    for step in pipelines:
-        if step.get("uses") == "go/build":
-            go_package = step.get("with", {}).get("go-package", "")
-            if go_package.startswith("go-fips"):
-                main_uses_fips = True
-                break
+    main_test = test_steps(melange_cfg)
+    main_has_fips_test = uses_any(main_test, frozenset({FIPS_TEST}))
+    main_builds_fips = builds_with_fips(melange_cfg.get("pipeline"), env_has_fips_go)
+    # split/bin in a subpackage moves the main package's binaries there: the
+    # subpackage inherits the obligation and the main package is left with none.
+    split_off = [
+        s for s in subpackages if uses_any(s.get("pipeline"), frozenset({SPLIT_BIN}))
+    ]
 
-    # Check main test section
-    test_section = melange_cfg.get("test", {})
-    test_pipelines = test_section.get("pipeline", [])
-    main_has_emptypackage_test = False
-    for step in test_pipelines:
-        if step.get("uses") == "test/go-fips-check":
-            main_has_test = True
-        elif step.get("uses") == "test/emptypackage":
-            main_has_emptypackage_test = True
+    if (
+        main_builds_fips
+        and not split_off
+        and not main_has_fips_test
+        and not uses_any(main_test, EMPTY_PACKAGE_TESTS)
+    ):
+        issues.append(
+            f"main package builds with a FIPS Go toolchain but lacks {FIPS_TEST}",
+        )
 
-    # If main package has emptypackage test, it doesn't need go-fips test
-    if main_uses_fips and not main_has_test and not main_has_emptypackage_test:
-        issues.append("main package uses go-fips but lacks test/go-fips-check")
-
-    # Check each subpackage
-    for i, subpkg in enumerate(melange_cfg.get("subpackages", [])):
-        subpkg_uses_fips = False
-        subpkg_has_test = False
-        subpkg_name = subpkg.get("name", f"subpackage-{i}")
-
-        # Check subpackage pipelines for go-fips usage
-        subpkg_pipelines = subpkg.get("pipeline", [])
-        for step in subpkg_pipelines:
-            if step.get("uses") == "go/build":
-                go_package = step.get("with", {}).get("go-package", "")
-                if go_package.startswith("go-fips"):
-                    subpkg_uses_fips = True
-                    break
-
-        # Check subpackage test sections
-        subpkg_test_section = subpkg.get("test", {})
-        subpkg_test_pipelines = subpkg_test_section.get("pipeline", [])
-        subpkg_has_emptypackage_test = False
-        for step in subpkg_test_pipelines:
-            if step.get("uses") == "test/go-fips-check":
-                subpkg_has_test = True
-            elif step.get("uses") == "test/emptypackage":
-                subpkg_has_emptypackage_test = True
-
-        # If subpackage has emptypackage test, it doesn't need go-fips test
-        if (
-            subpkg_uses_fips
-            and not subpkg_has_test
-            and not subpkg_has_emptypackage_test
+    for i, subpkg in enumerate(subpackages):
+        name = str(subpkg.get("name", f"#{i}"))
+        builds_fips = builds_with_fips(subpkg.get("pipeline"), env_has_fips_go) or (
+            main_builds_fips and any(s is subpkg for s in split_off)
+        )
+        if not builds_fips:
+            continue
+        sub_test = test_steps(subpkg)
+        if uses_any(sub_test, frozenset({FIPS_TEST})) or uses_any(
+            sub_test,
+            EMPTY_PACKAGE_TESTS,
         ):
-            issues.append(
-                f"subpackage '{subpkg_name}' uses go-fips but lacks test/go-fips-check",
-            )
+            continue
+        if main_has_fips_test and installed_in_main_test(melange_cfg, name):
+            continue
+        issues.append(
+            f"subpackage '{name}' builds with a FIPS Go toolchain but lacks "
+            f"{FIPS_TEST} (in its own test, or in the main test with the "
+            "subpackage installed)",
+        )
 
-    return len(issues) == 0, issues
+    return issues
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Check that packages using go-fips have corresponding go-fips tests",
+        description="Check that packages built with a FIPS Go toolchain "
+        f"have a {FIPS_TEST} test",
     )
     parser.add_argument("filenames", nargs="*", help="Filenames to check")
     args = parser.parse_args(argv)
@@ -109,13 +176,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             retval = 1
             continue
 
-        if not melange_cfg:
+        if not isinstance(melange_cfg, dict):
             continue
 
-        is_compliant, issues = check_go_fips_compliance(melange_cfg)
-        if not is_compliant:
-            for issue in issues:
-                print(f"{filename}: {issue}")
+        for issue in check_go_fips_compliance(melange_cfg):
+            print(f"{filename}: {issue}")
             retval = 1
 
     return retval
