@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Iterator
 from collections.abc import Sequence
 from typing import Any
 
@@ -10,69 +11,54 @@ import ruamel.yaml
 yaml = ruamel.yaml.YAML(typ="safe")
 
 
-def check_pipeline_steps(melange_cfg: dict[str, Any]) -> tuple[bool, list[str]]:
+def iter_pipelines(melange_cfg: dict[str, Any]) -> Iterator[tuple[str, list[Any]]]:
+    """Yield (label, steps) for every pipeline in a melange config.
+
+    Covers the main build and test pipelines and each subpackage's build and
+    test pipelines. A ``pipeline:`` key with no value (YAML null) yields an
+    empty list, matching how melange treats it.
     """
-    Check if any pipeline steps have only a 'name' field without 'uses' or other details.
-    Returns (is_valid, list_of_issues).
+    scopes: list[tuple[str, dict[str, Any]]] = [("main", melange_cfg)]
+    for i, subpkg in enumerate(melange_cfg.get("subpackages") or []):
+        if isinstance(subpkg, dict):
+            scopes.append((f"subpackage '{subpkg.get('name', i)}'", subpkg))
+    for label, scope in scopes:
+        yield f"{label} pipeline", scope.get("pipeline") or []
+        test = scope.get("test") or {}
+        if isinstance(test, dict):
+            yield f"{label} test pipeline", test.get("pipeline") or []
+
+
+def iter_steps(steps: list[Any]) -> Iterator[dict[str, Any]]:
+    """Yield every dict step in *steps*, descending into nested ``pipeline:`` lists."""
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        yield step
+        yield from iter_steps(step.get("pipeline") or [])
+
+
+def check_pipeline_steps(melange_cfg: dict[str, Any]) -> list[str]:
+    """Return a message for every step that consists of nothing but a ``name``.
+
+    melange runs such a step as a no-op, so it is either a typo for ``uses:``
+    or a heading that was meant to sit on the step that follows it.
     """
     issues = []
-
-    # Check main pipeline
-    pipelines = melange_cfg.get("pipeline", [])
-    for i, step in enumerate(pipelines):
-        if isinstance(step, dict):
-            # Check if step has only 'name' and no 'uses'
-            if "name" in step and "uses" not in step and len(step) == 1:
-                step_name = step.get("name", f"step {i}")
+    for label, steps in iter_pipelines(melange_cfg):
+        for step in iter_steps(steps):
+            if set(step) == {"name"}:
                 issues.append(
-                    f"main pipeline step '{step_name}' has only a name with no 'uses' or other details",
+                    f"{label} step '{step['name']}' has only a name and does "
+                    "nothing; use 'uses:' for a pipeline, or fold the name into "
+                    "the next step",
                 )
-
-    # Check test pipeline
-    test_section = melange_cfg.get("test", {})
-    test_pipelines = test_section.get("pipeline", [])
-    for i, step in enumerate(test_pipelines):
-        if isinstance(step, dict):
-            # Check if step has only 'name' and no 'uses'
-            if "name" in step and "uses" not in step and len(step) == 1:
-                step_name = step.get("name", f"step {i}")
-                issues.append(
-                    f"test pipeline step '{step_name}' has only a name with no 'uses' or other details",
-                )
-
-    # Check each subpackage
-    for sub_idx, subpkg in enumerate(melange_cfg.get("subpackages", [])):
-        subpkg_name = subpkg.get("name", f"subpackage-{sub_idx}")
-
-        # Check subpackage pipelines
-        subpkg_pipelines = subpkg.get("pipeline", [])
-        for i, step in enumerate(subpkg_pipelines):
-            if isinstance(step, dict):
-                # Check if step has only 'name' and no 'uses'
-                if "name" in step and "uses" not in step and len(step) == 1:
-                    step_name = step.get("name", f"step {i}")
-                    issues.append(
-                        f"subpackage '{subpkg_name}' pipeline step '{step_name}' has only a name with no 'uses' or other details",
-                    )
-
-        # Check subpackage test pipelines
-        subpkg_test_section = subpkg.get("test", {})
-        subpkg_test_pipelines = subpkg_test_section.get("pipeline", [])
-        for i, step in enumerate(subpkg_test_pipelines):
-            if isinstance(step, dict):
-                # Check if step has only 'name' and no 'uses'
-                if "name" in step and "uses" not in step and len(step) == 1:
-                    step_name = step.get("name", f"step {i}")
-                    issues.append(
-                        f"subpackage '{subpkg_name}' test pipeline step '{step_name}' has only a name with no 'uses' or other details",
-                    )
-
-    return len(issues) == 0, issues
+    return issues
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Check that pipeline steps don't have only a name without uses or other details",
+        description="Check that no melange pipeline step consists of only a name",
     )
     parser.add_argument("filenames", nargs="*", help="Filenames to check")
     args = parser.parse_args(argv)
@@ -88,13 +74,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             retval = 1
             continue
 
-        if not melange_cfg:
+        if not isinstance(melange_cfg, dict):
             continue
 
-        is_valid, issues = check_pipeline_steps(melange_cfg)
-        if not is_valid:
-            for issue in issues:
-                print(f"{filename}: {issue}")
+        for issue in check_pipeline_steps(melange_cfg):
+            print(f"{filename}: {issue}")
             retval = 1
 
     return retval

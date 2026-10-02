@@ -33,6 +33,10 @@ subpackages:
     pipeline:
       - name: bad-subpkg-step  # BAD: Only has name
       - uses: split/dev
+      - name: grouped steps
+        pipeline:
+          - name: nested-bad-step  # BAD: name-only inside a nested pipeline
+          - runs: echo hello
     test:
       pipeline:
         - name: subpkg-test-step  # BAD: Only has name in test section

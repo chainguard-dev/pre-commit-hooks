@@ -46,3 +46,9 @@ subpackages:
     test:
       pipeline:
         - uses: test/emptypackage  # GOOD: Uses 'uses' in test section
+  - name: test-subpkg-meta
+    description: "Meta subpackage: an empty pipeline is allowed and must not trip the hook"
+    pipeline:
+    test:
+      pipeline:
+        - uses: test/emptypackage
