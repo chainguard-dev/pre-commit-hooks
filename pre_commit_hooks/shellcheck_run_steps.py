@@ -3,10 +3,14 @@ from __future__ import annotations
 import argparse
 import contextlib
 import os
+import re
 import subprocess
 import tempfile
 from collections.abc import Mapping
 from collections.abc import Sequence
+from datetime import datetime
+from datetime import timedelta
+from datetime import timezone
 from typing import Any
 
 import ruamel.yaml
@@ -16,8 +20,18 @@ yaml = ruamel.yaml.YAML(typ="safe")
 # Please provide the output of `grype koalaman/shellcheck@sha256:<newhash>`
 # in your PR when bumping. Referenced by SHA for safety.
 DefaultShellCheckImage = "koalaman/shellcheck@sha256:652a5a714dc2f5f97e36f565d4f7d2322fea376734f3ec1b04ed54ce2a0b124f"
-# 0.31.6 pinning to resolve var-transforms linting error
+# Tracks the latest melange; docker_image_outdated() below refreshes a stale
+# local copy so new config fields (e.g. `test-resources`) compile.
 MelangeImage = "cgr.dev/chainguard/melange:latest"
+# How old the local melange image may get before `docker run` re-pulls it.
+# Override per repo with `args: [--max-image-age-days=N]`.
+DefaultMaxImageAgeDays = 7
+
+# `docker image inspect --format {{.Created}}` prints RFC 3339 with up to
+# nanosecond precision, e.g. 2025-07-31T02:42:03.371039353Z. Python < 3.11
+# datetime.fromisoformat() accepts only 0, 3 or 6 fractional digits, so the
+# fraction is dropped before parsing; day-level age does not need it.
+_FRACTIONAL_SECONDS = re.compile(r"\.\d+(?=(?:Z|[+-]\d{2}:\d{2})$)")
 
 # Pipeline directories per package tier, matching stereo's dirToPipelineDirs.
 # Paths are relative to the repo root (the Docker /work mount).
@@ -100,6 +114,43 @@ def do_shellcheck(
     return True
 
 
+def parse_docker_timestamp(created: str) -> datetime:
+    """Parse a docker `.Created` value into an aware datetime."""
+    created = _FRACTIONAL_SECONDS.sub("", created.strip())
+    if created.endswith("Z"):
+        created = created[:-1] + "+00:00"
+    return datetime.fromisoformat(created)
+
+
+def docker_image_outdated(image: str, max_age: timedelta) -> bool:
+    """Return True if *image* is absent locally or was created more than *max_age* ago.
+
+    The caller turns this into `docker run --pull=always`, so there is a single
+    pull code path and a missing image is handled the same way as a stale one.
+    If docker itself is unusable the later `docker run` reports that with its
+    own error, so this only answers the age question.
+    """
+    result = subprocess.run(
+        ["docker", "image", "inspect", image, "--format", "{{.Created}}"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return True
+    try:
+        created = parse_docker_timestamp(result.stdout)
+    except ValueError as exc:
+        print(f"Warning: cannot parse creation time of {image}: {exc}")
+        return False
+    age = datetime.now(timezone.utc) - created
+    if age > max_age:
+        # flush so the line lands before docker's own pull output
+        print(f"{image} is {age.days} days old; refreshing it", flush=True)
+        return True
+    return False
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -119,6 +170,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         nargs="*",
         help="shellcheck command",
     )
+    parser.add_argument(
+        "--max-image-age-days",
+        type=int,
+        default=DefaultMaxImageAgeDays,
+        metavar="DAYS",
+        help="refresh the melange image when the local copy is older than this "
+        "many days (default: %(default)s; 0 refreshes on every run)",
+    )
     args = parser.parse_args(argv)
     try:
         idx = args.filenames.index("--")
@@ -127,6 +186,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ValueError:
         shellcheck_args = []
         filenames = args.filenames
+
+    # Decided once per invocation, after argument parsing so that `--help`
+    # never touches docker. The first `docker run` below performs the refresh.
+    pull_policy = "missing"
+    if docker_image_outdated(MelangeImage, timedelta(days=args.max_image_age_days)):
+        pull_policy = "always"
 
     fail_cnt = 0
     melange_cfg = {}
@@ -142,6 +207,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 [
                     "docker",
                     "run",
+                    f"--pull={pull_policy}",
                     f"--volume={os.getcwd()}:/work:Z",
                     "--rm",
                     MelangeImage,
@@ -152,6 +218,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 ],
                 stdout=compiled_out,
             )
+            # One refresh per invocation is enough.
+            pull_policy = "missing"
             compiled_out.close()
             try:
                 with open(compiled_out.name) as compiled_in:
