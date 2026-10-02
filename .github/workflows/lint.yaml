@@ -33,3 +33,25 @@ jobs:
       shell: bash
     - run: pre-commit run --show-diff-on-failure --color=always --all-files
       shell: bash
+
+  test:
+    name: Shell script tests
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+    - name: Harden the runner (Audit all outbound calls)
+      uses: step-security/harden-runner@8d3c67de8e2fe68ef647c8db1e6a09f647780f40 # v2.19.0
+      with:
+        egress-policy: audit
+
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      with:
+        persist-credentials: false
+
+    # The tests build throwaway repos under /tmp with their own origin remote and
+    # their own committer identity, so they need no runner git config.
+    - run: tests/test-check-for-epoch-bump.sh
+      shell: bash
