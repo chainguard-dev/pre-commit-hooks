@@ -29,3 +29,13 @@
     - pre-commit
     - manual
   files: ^restored-packages\.txt$
+- id: check-for-go-fips-test
+  name: check for go-fips test
+  description: Check that packages using go-fips have corresponding go-fips tests
+  entry: check-for-go-fips-test
+  language: python
+  stages:
+    - pre-commit
+    - manual
+  types:
+    - yaml
