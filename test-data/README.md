@@ -28,3 +28,18 @@ same command works from another repo by replacing `.` with that path.
 - Expected: passes. Every step has `uses:` or `runs:` alongside any `name:`,
   and the last subpackage has an empty `pipeline:` key, which melange allows
   and the hook must not trip over.
+
+### go-fips-test-bad.yaml
+
+- Hook: `check-for-go-fips-test`
+- Expected: fails with three findings: the main package, built by `go/build`
+  with a `go-fips` toolchain; a subpackage built by `go/build/v2` with the
+  environment's `go-fips`; and a subpackage with a hand-written `go build`.
+  None of the three has a `test/go-fips-check`.
+
+### go-fips-test-good.yaml
+
+- Hook: `check-for-go-fips-test`
+- Expected: passes. Range subpackages are covered by the main test, which
+  installs them and runs `test/go-fips-check`; another subpackage carries its
+  own check; one builds no Go at all; and one has an empty `pipeline:`.

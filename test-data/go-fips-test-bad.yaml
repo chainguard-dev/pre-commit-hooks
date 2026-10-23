@@ -1,0 +1,49 @@
+package:
+  name: fips-bad
+  version: "1.0.0"
+  epoch: 0
+  description: "Builds Go binaries with go-fips but never runs test/go-fips-check"
+  copyright:
+    - license: Apache-2.0
+
+environment:
+  contents:
+    packages:
+      - busybox
+      - go-fips-1.25
+
+pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://example.invalid/fips-bad
+      tag: v${{package.version}}
+      expected-commit: 0000000000000000000000000000000000000000
+  - uses: go/build
+    with:
+      packages: .
+      output: fips-bad
+      go-package: go-fips-md5-1.25
+
+test:
+  pipeline:
+    - uses: test/tw/ldd-check  # BAD: main binary is built with go-fips, no test/go-fips-check
+
+subpackages:
+  - name: ${{package.name}}-helper
+    pipeline:
+      - uses: go/build/v2  # BAD: builds with the environment's go-fips, test lacks go-fips-check
+        with:
+          packages: ./cmd/helper
+          output: helper
+    test:
+      pipeline:
+        - uses: test/tw/help-check
+          with:
+            bins: helper
+  - name: ${{package.name}}-manual
+    pipeline:
+      - runs: |  # BAD: hand-written go build with the environment's go-fips
+          go build -o "${{targets.contextdir}}/usr/bin/manual" ./cmd/manual
+    test:
+      pipeline:
+        - uses: test/tw/ldd-check
