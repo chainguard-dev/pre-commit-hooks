@@ -19,6 +19,7 @@ repos:
               [^/]+\.ya?ml                      # matches .yaml or .yml files at the top level only
           )$
       - id: check-pipeline-name-only-steps
+        files: '^[^.][^/]*\.yaml$' # matches non-hidden .yaml files at the top level only
       - id: check-for-go-fips-test
         files: '^[^.][^/]*\.yaml$' # matches non-hidden .yaml files at the top level only
   - repo: https://github.com/chainguard-dev/yam

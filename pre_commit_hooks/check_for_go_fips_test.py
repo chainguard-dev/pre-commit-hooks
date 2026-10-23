@@ -3,17 +3,27 @@ from __future__ import annotations
 import argparse
 import re
 import sys
-from collections.abc import Iterator
 from collections.abc import Sequence
 from typing import Any
 
-import ruamel.yaml
-
-yaml = ruamel.yaml.YAML(typ="safe")
+from pre_commit_hooks.melange import build_steps
+from pre_commit_hooks.melange import environment_packages
+from pre_commit_hooks.melange import iter_steps
+from pre_commit_hooks.melange import resolve_vars
+from pre_commit_hooks.melange import run_check
+from pre_commit_hooks.melange import subpackages
+from pre_commit_hooks.melange import test_steps
+from pre_commit_hooks.melange import uses_any
 
 # Go toolchain packages that imply a FIPS build, matched as prefixes against
-# environment packages and `go-package:` inputs (go-fips, go-fips-md5-1.25, ...).
-FIPS_GO_PREFIXES = ("go-fips",)
+# environment packages and `go-package:` inputs. One entry per toolchain family
+# test/go-fips-check knows how to verify:
+#   go-fips, go-fips-md5  Microsoft-patched Go with the OpenSSL backend; at 1.27
+#                         these are meta packages pointing at go-msft-1.27
+#   go-msft               the same toolchain under its own name (systemcrypto)
+#   go-geomys             Geomys Go with the native FIPS 140 module
+#   go-openssl            unpatched golang-fips/go
+FIPS_GO_PREFIXES = ("go-fips", "go-msft", "go-geomys", "go-openssl")
 
 # Pipelines that install the toolchain named by their `go-package` input.
 GO_PIPELINES_WITH_TOOLCHAIN_INPUT = frozenset({"go/build", "go/install"})
@@ -22,40 +32,14 @@ GO_PIPELINES_FROM_ENVIRONMENT = frozenset({"go/build/v2"})
 # `runs:` blocks that call the compiler directly also use the environment's go.
 GO_BUILD_COMMAND = re.compile(r"\bgo\s+(build|install)\b")
 
-FIPS_TEST = "test/go-fips-check"
+FIPS_TEST = frozenset({"test/go-fips-check"})
 EMPTY_PACKAGE_TESTS = frozenset({"test/emptypackage", "test/tw/emptypackage"})
 # Moves the main package's binaries into a subpackage, which then owns the test.
-SPLIT_BIN = "split/bin"
-
-
-def iter_steps(steps: Any) -> Iterator[dict[str, Any]]:
-    """Yield every dict step in *steps*, descending into nested ``pipeline:`` lists."""
-    for step in steps or []:
-        if not isinstance(step, dict):
-            continue
-        yield step
-        yield from iter_steps(step.get("pipeline"))
-
-
-def uses_any(steps: Any, pipelines: frozenset[str]) -> bool:
-    return any(step.get("uses") in pipelines for step in iter_steps(steps))
+SPLIT_BIN = frozenset({"split/bin"})
 
 
 def is_fips_toolchain(package: Any) -> bool:
     return isinstance(package, str) and package.startswith(FIPS_GO_PREFIXES)
-
-
-def environment_packages(scope: dict[str, Any]) -> list[Any]:
-    """Packages listed under ``environment.contents.packages`` of *scope*."""
-    env = scope.get("environment") or {}
-    contents = (env.get("contents") or {}) if isinstance(env, dict) else {}
-    packages = contents.get("packages") if isinstance(contents, dict) else None
-    return list(packages or [])
-
-
-def test_steps(scope: dict[str, Any]) -> list[Any]:
-    test = scope.get("test") or {}
-    return list(test.get("pipeline") or []) if isinstance(test, dict) else []
 
 
 def builds_with_fips(steps: Any, env_has_fips_go: bool) -> bool:
@@ -107,21 +91,20 @@ def check_go_fips_compliance(melange_cfg: dict[str, Any]) -> list[str]:
     test/go-fips-check and installs the subpackage.
     """
     issues = []
+    # Toolchain names are often templated (`go-package: ${{vars.go-package}}`);
+    # resolve what can be resolved without a melange compile.
+    melange_cfg = resolve_vars(melange_cfg)
     env_has_fips_go = any(
         is_fips_toolchain(p) for p in environment_packages(melange_cfg)
     )
-    subpackages = [
-        s for s in melange_cfg.get("subpackages") or [] if isinstance(s, dict)
-    ]
+    subs = subpackages(melange_cfg)
 
     main_test = test_steps(melange_cfg)
-    main_has_fips_test = uses_any(main_test, frozenset({FIPS_TEST}))
-    main_builds_fips = builds_with_fips(melange_cfg.get("pipeline"), env_has_fips_go)
+    main_has_fips_test = uses_any(main_test, FIPS_TEST)
+    main_builds_fips = builds_with_fips(build_steps(melange_cfg), env_has_fips_go)
     # split/bin in a subpackage moves the main package's binaries there: the
     # subpackage inherits the obligation and the main package is left with none.
-    split_off = [
-        s for s in subpackages if uses_any(s.get("pipeline"), frozenset({SPLIT_BIN}))
-    ]
+    split_off = [s for s in subs if uses_any(build_steps(s), SPLIT_BIN)]
 
     if (
         main_builds_fips
@@ -130,27 +113,24 @@ def check_go_fips_compliance(melange_cfg: dict[str, Any]) -> list[str]:
         and not uses_any(main_test, EMPTY_PACKAGE_TESTS)
     ):
         issues.append(
-            f"main package builds with a FIPS Go toolchain but lacks {FIPS_TEST}",
+            "main package builds with a FIPS Go toolchain but lacks test/go-fips-check",
         )
 
-    for i, subpkg in enumerate(subpackages):
+    for i, subpkg in enumerate(subs):
         name = str(subpkg.get("name", f"#{i}"))
-        builds_fips = builds_with_fips(subpkg.get("pipeline"), env_has_fips_go) or (
+        builds_fips = builds_with_fips(build_steps(subpkg), env_has_fips_go) or (
             main_builds_fips and any(s is subpkg for s in split_off)
         )
         if not builds_fips:
             continue
         sub_test = test_steps(subpkg)
-        if uses_any(sub_test, frozenset({FIPS_TEST})) or uses_any(
-            sub_test,
-            EMPTY_PACKAGE_TESTS,
-        ):
+        if uses_any(sub_test, FIPS_TEST) or uses_any(sub_test, EMPTY_PACKAGE_TESTS):
             continue
         if main_has_fips_test and installed_in_main_test(melange_cfg, name):
             continue
         issues.append(
             f"subpackage '{name}' builds with a FIPS Go toolchain but lacks "
-            f"{FIPS_TEST} (in its own test, or in the main test with the "
+            "test/go-fips-check (in its own test, or in the main test with the "
             "subpackage installed)",
         )
 
@@ -160,30 +140,11 @@ def check_go_fips_compliance(melange_cfg: dict[str, Any]) -> list[str]:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Check that packages built with a FIPS Go toolchain "
-        f"have a {FIPS_TEST} test",
+        "have a test/go-fips-check test",
     )
     parser.add_argument("filenames", nargs="*", help="Filenames to check")
     args = parser.parse_args(argv)
-
-    retval = 0
-
-    for filename in args.filenames:
-        try:
-            with open(filename) as f:
-                melange_cfg = yaml.load(f)
-        except Exception as e:
-            print(f"Error loading {filename}: {e}")
-            retval = 1
-            continue
-
-        if not isinstance(melange_cfg, dict):
-            continue
-
-        for issue in check_go_fips_compliance(melange_cfg):
-            print(f"{filename}: {issue}")
-            retval = 1
-
-    return retval
+    return run_check(args.filenames, check_go_fips_compliance)
 
 
 if __name__ == "__main__":
