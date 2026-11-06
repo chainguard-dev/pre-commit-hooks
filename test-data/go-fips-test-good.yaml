@@ -1,0 +1,73 @@
+package:
+  name: fips-good
+  version: "1.0.0"
+  epoch: 0
+  description: "Every go-fips build is covered by a test/go-fips-check"
+  copyright:
+    - license: Apache-2.0
+
+environment:
+  contents:
+    packages:
+      - busybox
+      - go-fips-1.25
+
+pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://example.invalid/fips-good
+      tag: v${{package.version}}
+      expected-commit: 0000000000000000000000000000000000000000
+  - uses: go/build
+    with:
+      packages: .
+      output: fips-good
+      go-package: go-fips-md5-1.25
+
+data:
+  - name: components
+    items:
+      controller: controller
+      agent: agent
+
+test:
+  environment:
+    contents:
+      packages:
+        - ${{package.name}}-controller
+        - ${{package.name}}-agent
+  pipeline:
+    - uses: test/go-fips-check  # GOOD: covers the main binary and the installed subpackages
+
+subpackages:
+  - name: ${{package.name}}-${{range.key}}  # GOOD: installed in the main test, which runs go-fips-check
+    range: components
+    pipeline:
+      - uses: go/build/v2
+        with:
+          packages: ./cmd/${{range.key}}
+          output: ${{range.key}}
+    test:
+      pipeline:
+        - uses: test/tw/ldd-check
+  - name: ${{package.name}}-tools
+    pipeline:
+      - runs: |
+          go build -o "${{targets.contextdir}}/usr/bin/tools" ./cmd/tools
+    test:
+      pipeline:
+        - uses: test/go-fips-check  # GOOD: covered by its own test
+  - name: ${{package.name}}-compat
+    pipeline:
+      - runs: |
+          mkdir -p "${{targets.contextdir}}/usr/local/bin"
+          ln -sf /usr/bin/fips-good "${{targets.contextdir}}/usr/local/bin/fips-good"
+    test:
+      pipeline:
+        - uses: test/tw/symlink-check  # GOOD: no Go build in this subpackage
+  - name: ${{package.name}}-meta
+    description: "An empty pipeline is allowed and must not trip the hook"
+    pipeline:
+    test:
+      pipeline:
+        - uses: test/tw/emptypackage
